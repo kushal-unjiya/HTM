@@ -1,21 +1,25 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-import textract
-import uvicorn
+from flask import Flask, request, jsonify
+from pdfminer.high_level import extract_text
+from io import BytesIO
 
-app = FastAPI()
+app = Flask(__name__)
 
-@app.post('/convert')
-async def convert_pdf_to_text(file: UploadFile = File(...)):
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Invalid file format. Only PDFs are accepted.")
+@app.route('/read_pdf', methods=['POST'])
+def read_pdf():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
 
     try:
-        # Convert the PDF to text
-        text = textract.process(file.file)
-        # Return the text as the response
-        return {"text": text.decode('utf-8')}
+        file_stream = BytesIO(file.read())
+        text = extract_text(file_stream)
+        print("Extracted text:", text)  # Print the extracted text to the terminal
+        return jsonify({'text': text})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    uvicorn.run(app, host='0.0.0.0', port=8000)
+    app.run(debug=True)  # Enable debug mode for better error messages
