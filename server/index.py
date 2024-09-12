@@ -1,25 +1,40 @@
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pdfminer.high_level import extract_text
 from io import BytesIO
+import os
+import uuid
+import shutil  # Import shutil
 
-app = Flask(__name__)
+app = FastAPI()
 
-@app.route('/read_pdf', methods=['POST'])
-def read_pdf():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    file = request.files['file']
+@app.post('/read_pdf')
+async def read_pdf(file: UploadFile = File(...)):
+    if not file:
+        raise HTTPException(status_code=400, detail="No file part")
+
     if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+        raise HTTPException(status_code=400, detail="No selected file")
 
     try:
-        file_stream = BytesIO(file.read())
+        file_stream = BytesIO(await file.read())
         text = extract_text(file_stream)
         print("Extracted text:", text)  # Print the extracted text to the terminal
-        return jsonify({'text': text})
+        return JSONResponse(content={'text': text})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 if __name__ == '__main__':
-    app.run(debug=True)  # Enable debug mode for better error messages
+    import uvicorn
+    uvicorn.run(app, host='127.0.0.2', port=8000)
